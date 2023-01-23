@@ -1,0 +1,125 @@
+---
+title: "Test 3D plots"
+output: html_notebook
+---
+16.12.2021
+Juan G. Diaz Ochoa
+
+Test of 3D ploting ussing [this package](http://www.sthda.com/english/wiki/a-complete-guide-to-3d-visualization-device-system-in-r-r-software-and-data-visualization)
+
+```{r}
+library("rgl")
+```
+
+
+Download data
+```{r}
+data(iris)
+head(iris)
+```
+Coordinates
+```{r}
+x <- sep.l <- iris$Sepal.Length
+y <- pet.l <- iris$Petal.Length
+z <- sep.w <- iris$Sepal.Width
+```
+
+scatter plot
+```{r}
+rgl.open() # Open a new RGL device
+rgl.points(x, y, z, color ="lightgray") # Scatter plot
+```
+
+Same scatterplot with different shapes
+
+```{r}
+rgl.open()# Open a new RGL device
+rgl.bg(color = "white") # Setup the background color
+rgl.spheres(x, y, z, r = 0.2, color = "grey") 
+```
+scatter plot in a box. To this end a new device must be initialized
+
+```{r}
+#' @param new.device a logical value. If TRUE, creates a new device
+#' @param bg the background color of the device
+#' @param width the width of the device
+rgl_init <- function(new.device = FALSE, bg = "white", width = 640) { 
+  if( new.device | rgl.cur() == 0 ) {
+    rgl.open()
+    par3d(windowRect = 50 + c( 0, 0, width, width ) )
+    rgl.bg(color = bg )
+  }
+  rgl.clear(type = c("shapes", "bboxdeco"))
+  rgl.viewpoint(theta = 15, phi = 20, zoom = 0.7)
+}
+```
+
+And then the data can be represented
+
+
+```{r}
+rgl_init()
+rgl.spheres(x, y, z, r = 0.2, color = "yellow", xlabel = "x")  # Scatter plot
+rgl.bbox(color = "#333377") # Add bounding box decoration
+```
+
+Alternative representation
+
+```{r}
+rgl_init()
+plot3d(x, y, z, col="blue", type ="p")
+```
+
+```{r}
+rgl_init()
+plot3d(x, y, z, col="blue", box = FALSE,
+       type ="s", radius = 0.15)
+```
+
+Test Results from persistent topology
+
+```{r}
+Phy_S_Diag_Mhealt_x <- read.csv("D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results/Phy_S_Diag_Mhealt_x.csv")
+Phy_S_Diag_Mhealt_y <- read.csv("D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results/Phy_S_Diag_Mhealt_y.csv")
+Phy_S_Diag_Mhealt_z <- read.csv("D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results/Phy_S_Diag_Mhealt_z.csv")
+```
+Coordinates
+```{r}
+x <- Phy_S_Diag_Mhealt_x$Geom_Phi
+y <- Phy_S_Diag_Mhealt_y$Geom_Phi
+z <- Phy_S_Diag_Mhealt_z$Geom_Phi
+```
+
+3D representation
+```{r}
+rgl_init()
+rgl.spheres(x, y, z, r = 0.09, color = "yellow", xlabel = "x")  # Scatter plot
+rgl.bbox(color = "#333377") # Add bounding box decoration
+```
+
+Alternative representation
+
+```{r}
+rgl_init()
+plot3d(x, y, z, col="blue", type ="p")
+```
+
+```{r}
+rgl_init()
+plot3d(x, y, z, col="blue", box = FALSE,
+       type ="s", radius = 0.085)
+#ellips <- ellipse3d(cov(cbind(x,y,z)), 
+#            centre=c(x, y, z), level = 0.2)
+#plot3d(ellips, col = "blue", alpha = 0.2, add = TRUE, box = FALSE)
+```
+
+```{r}
+rgl.snapshot(filename = "D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results/Phy_G_3D_Sport.png")
+```
+
+```{r}
+test_data <- read.csv("D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results/Phy_S_Diag_Mhealt_x.csv")
+plot(test_data$S_M,test_data$Geom_Phi)
+
+```
+
