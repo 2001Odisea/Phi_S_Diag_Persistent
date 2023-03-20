@@ -1,6 +1,8 @@
 # Phi_S_Diag_Persistent
  
-In this code we present the implementaiton of the Phi_S diagram, according to the report presented in this article: https://www.biorxiv.org/content/10.1101/2022.01.21.477230v1 
-The essential concept of this method is to define the existence of causal pathways that could led to the definition of robust models in systems biology. To this end, the patterns in time series are anaysed using persistent homology, which is a robust method against noise to extract topological features from data. 
+The goal of this computation is to use both persistent homology to recognize stable patterns in trajectories and integrated geometrical information (a branch of the integrated information theory) to track inherent information processes leading to a cause-effect repertoire, which cannot be easily accessed by an external observer and which cannot be trivially reduced to mechanistic causal effects.
 
-In this investigation we analysed the cardiac response to excersise in patients wearing sensors; this data has been downloaded from the following repository: https://archive.ics.uci.edu/ml/datasets/MHEALTH+Dataset 
+For the evaluation of the persistent homology we used the function gridDiag from the R-package TDA, which evaluates a given real valued function over a triangulated grid, constructs a filtration of simplices using the values of the function, and computes the persistent homology of the filtration.
+
+A similar approach based on persistent homology has been used for the extraction of system inter-variability in populations with complex-multiscale systems. In such works the Geometrical Integrated Information Theory and the analysis of topological persistence for each individual in different time events are quite similar. This could imply that the implemented methodology can be used to analyze causality chains in different time scales and assess in this way how autonomous is a system.
+
