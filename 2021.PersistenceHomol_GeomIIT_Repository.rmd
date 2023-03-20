@@ -1,0 +1,532 @@
+---
+title: "Homology Persistence adapted to the analysis of geometrical theory of integrated information (G-TII)"
+output: html_notebook
+---
+Juan G. Diaz Ochoa
+
+First - April 22 2021
+Last modified: March 2023
+
+The results in this Notebook have been reported in [this article](https://www.biorxiv.org/content/10.1101/2022.01.21.477230v1), where the concept of $\Phi_S$ diagram has been introduced.
+
+## Background
+The goal of this computation is to use both persistent homology, to recognize stable patterns in trajectories, and integrated geometrical information (a branch of the [integrated information theory](http://www.scholarpedia.org/article/Integrated_information_theory)) to track inherent information processes leading to a cause-effect repertoire, which cannot be easily accessed by an external observer and which cannot be trivially reduced to mechanistic causal effects. 
+
+For the evaluation of the persistent homology we used the [function gridDiag from the R-package TDA](https://cran.r-project.org/web/packages/TDA/vignettes/article.pdf), which evaluates a given real valued function over a triangulated grid, constructs a filtration of simplices using the values of the function, and computes the persistent homology of the filtration. 
+
+
+A similar approach based on persistent homology has been used for the [extraction of system inter-variability in populations with complex-multiscale systems](https://loop-impact.frontiersin.org/impact/article/465982#totalviews/views). In such works the Geometrical Integrated Information Theory and the analysis of topological persistence for each individual in different time events are quite similar. This could imply that the implemented methodology can be used to analyse causality chains in different time scales and assess in this way how autonomous is a system. 
+
+## Data 
+
+We will test again this methodology using acceleration and ECG data from this database - [database](http://archive.ics.uci.edu/ml/datasets/mhealth+dataset), as has been reported in my last [publication](https://www.frontiersin.org/articles/10.3389/fphy.2020.465982/full)
+
+
+# Activity set
+
+The activity set is listed in the following:
+
+  - L1: Standing still (1 min)
+  - L2: Sitting and relaxing (1 min)
+  - L3: Lying down (1 min)
+  - L4: Walking (1 min)
+  - L5: Climbing stairs (1 min)
+  - L6: Waist bends forward (20x)
+  - L7: Frontal elevation of arms (20x)
+  - L8: Knees bending (crouching) (20x)
+  - L9: Cycling (1 min)
+  - L10: Jogging (1 min)
+  - L11: Running (1 min)
+  - L12: Jump front & back (20x) 
+
+Download Databases physiological data - individuals [from](https://archive.ics.uci.edu/ml/machine-learning-databases/00319) 
+
+# Data attributes
+
+The data collected for each subject is stored in a different log file: 'mHealth_subject.log'. Each file contains the samples (by rows) recorded for all sensors (by columns). The labels used to identify the activities are similar to the above mentioned (e.g., the label for walking is '4').
+
+The meaning of each column is detailed next:
+
+  - Column 1: acceleration from the chest sensor (X axis)
+  - Column 2: acceleration from the chest sensor (Y axis)
+  - Column 3: acceleration from the chest sensor (Z axis)
+  - Column 4: electrocardiogram signal (lead 1)
+  - Column 5: electrocardiogram signal (lead 2)
+  - Column 6: acceleration from the left-ankle sensor (X axis)
+  - Column 7: acceleration from the left-ankle sensor (Y axis)
+  - Column 8: acceleration from the left-ankle sensor (Z axis)
+  - Column 9: gyro from the left-ankle sensor (X axis)
+  - Column 10: gyro from the left-ankle sensor (Y axis)
+  - Column 11: gyro from the left-ankle sensor (Z axis)
+  - Column 13: magnetometer from the left-ankle sensor (X axis)
+  - Column 13: magnetometer from the left-ankle sensor (Y axis)
+  - Column 14: magnetometer from the left-ankle sensor (Z axis)
+  - Column 15: acceleration from the right-lower-arm sensor (X axis)
+  - Column 16: acceleration from the right-lower-arm sensor (Y axis)
+  - Column 17: acceleration from the right-lower-arm sensor (Z axis)
+  - Column 18: gyro from the right-lower-arm sensor (X axis)
+  - Column 19: gyro from the right-lower-arm sensor (Y axis)
+  - Column 20: gyro from the right-lower-arm sensor (Z axis)
+  - Column 21: magnetometer from the right-lower-arm sensor (X axis)
+  - Column 22: magnetometer from the right-lower-arm sensor (Y axis)
+  - Column 23: magnetometer from the right-lower-arm sensor (Z axis)
+  - Column 24: Label (0 for the null class)
+
+Units: Acceleration (in $m/s^2$), gyroscope ($deg/s$), magnetic field (local), ecg (mV) 
+
+## Data evaluation
+
+Download libraries
+
+```{r}
+library("ggplot2")
+library("TDA")
+```
+
+Download dataset from database - source or from local database:
+
+* 0 Means, download Mhealth data from internet repository
+* 1 Means, download Mhelath data from the local repository
+* 2 Means, use only random data - as control
+* 3 means, use synthetic data for semi-recurrent time series
+
+```{r}
+library(readr)
+local <- 0
+if(local == 0){
+  fn <- "http://archive.ics.uci.edu/ml/machine-learning-databases/00319/MHEALTHDATASET.zip"
+  download.file(fn,destfile="zip")
+  unzip("zip",list = TRUE)
+  subj1 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject1.log"))
+  subj2 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject2.log"))
+  subj3 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject3.log"))
+  subj4 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject4.log"))
+  subj5 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject5.log"))
+  subj6 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject6.log"))
+  subj7 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject7.log"))
+  subj8 <- read.table(unzip("zip",files = "MHEALTHDATASET/mHealth_subject8.log"))
+}
+
+# Synthetic random data - no coupled
+if(local == 2){
+  subj1 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj2 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj3 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj4 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj5 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj6 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj7 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+  subj8 <- as.data.frame(cbind(runif(161280),runif(161280),runif(161280),runif(161280),runif(161280)))
+}
+# Synthetic data: different combination of semi-periodic time series - No real coupled model
+if(local == 3){
+  synthetic <- read_table2("RootDirectory/synthetic.txt")
+    subj1 <- as.data.frame(cbind(synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_1`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_4`,synthetic$`0.0000000e+000_5`))
+    subj2 <- as.data.frame(cbind(synthetic$`0.0000000e+000_1`,synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_4`))
+    subj3 <- as.data.frame(cbind(synthetic$`0.0000000e+000_5`,synthetic$`0.0000000e+000_4`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_1`))
+    subj4 <- as.data.frame(cbind(synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_4`,synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_5`))
+    subj5 <- as.data.frame(cbind(synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_1`,synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_5`))
+    subj6 <- as.data.frame(cbind(synthetic$`0.0000000e+000_4`,synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_1`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_3`))
+    subj7 <- as.data.frame(cbind(synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000`,synthetic$`0.0000000e+000_5`))
+    subj8 <- as.data.frame(cbind(synthetic$`0.0000000e+000_5`,synthetic$`0.0000000e+000_4`,synthetic$`0.0000000e+000_3`,synthetic$`0.0000000e+000_2`,synthetic$`0.0000000e+000_1`))
+}
+  
+```
+Define lists from the downloaded data
+
+```{r}
+SP <- list()
+SP[[1]] <- subj1
+SP[[2]] <- subj2
+SP[[3]] <- subj3
+SP[[4]] <- subj4
+SP[[5]] <- subj5
+SP[[6]] <- subj6
+SP[[7]] <- subj7
+SP[[8]] <- subj8
+NumberPatients <- 8
+```
+
+Generate a grid for Analysis using homology persistence
+```{r}
+Xlim <- c(-10, 10); Ylim <- c(-10, 10); by <- 0.03
+Xseq <- seq(Xlim[1], Xlim[2], by = by)
+Yseq <- seq(Ylim[1], Ylim[2], by = by)
+h <- 0.02
+
+Grid <- expand.grid(Xseq, Yseq)
+```
+
+Select the reference columns: this one is the corresponding axis where the acceleration is measured:
+1 is x; 
+2 is y; 
+3 is z
+```{r}
+axis <- 3
+```
+
+* For the Mhealth data: 
+In this analysis we perfom a simple relation between two main attributes:
+
+- chest acceleration (three axes)
+- ECG 
+
+According to this we define the following parameter:
+
+- $s_pa = {1,2,3} $ is the list number where the acceleration measured in the chest in the corresponding axis is measured (corresponds to column 1 to 3)
+- s_pb is the electrocardiogram signal, lead 1 (corresponds to column 4)
+
+* For other kind of data: select the second reference column
+```{r}
+Column_ECG <- 4
+```
+
+# Assess the cause-effect structure (CES) of a physical system that is applicable to discrete dynamical systems: first general test
+
+In this part we will implement the causality analysis over different time periods for single individuals using persistence diagrams. We compute these diagrams using the package TDA, as is described in this [article](https://cran.r-project.org/web/packages/TDA/vignettes/article.pdf).
+
+In a first instance we will implement an analysis only for two time periods. The goal is to develop and implement a more complex and complete analysis over different time periods - and discover in this way connected - disconnected causal pathways. 
+
+Construct three different phase data between acceleration considering different time periods
+
+First time period
+```{r}
+TP <- c()
+```
+
+```{r}
+TP[1] <- 1
+TP[2] <- 25000
+```
+Second time period
+```{r}
+TP[3] <- 20000
+TP[4] <- 45000
+```
+Third time period
+```{r}
+TP[5] <- 40000#115000
+TP[6] <- 60000#119000 
+```
+
+Define phase diagram between acceleration and ECG inside each time period:
+
+* Define a list of individuals correlating ECGs and Acceleration
+* Each list is constructed as a correlation over different periods of time
+
+
+```{r}
+XP <- list()
+XP_TP <- list()
+XP_T <- list()
+# introduce axis where this analysis should be performed
+if(axis == 3){
+  s_pa <- axis
+  s_pb <- Column_ECG 
+}
+if(axis == 2){
+  s_pa <- axis
+  s_pb <- Column_ECG 
+}
+if(axis == 1){
+  s_pa <- axis
+  s_pb <- Column_ECG 
+}
+# Definition of the different time periods
+# Iteration over all the individuals - axes are normalized
+# XP is the normalized trajectory combining two different parameters
+
+for(i in 1:NumberPatients){
+  XP[[1]] <- cbind(SP[[i]][[s_pa]][TP[1]:TP[2]]/max(abs(SP[[i]][[s_pa]][TP[1]:TP[2]])),SP[[i]][[s_pb]][TP[1]:TP[2]]/max(abs(SP[[i]][[s_pb]][TP[1]:TP[2]]))) 
+  XP[[2]] <- cbind(SP[[i]][[s_pa]][TP[3]:TP[4]]/max(abs(SP[[i]][[s_pa]][TP[3]:TP[4]])),SP[[i]][[s_pb]][TP[3]:TP[4]]/max(abs(SP[[i]][[s_pb]][TP[3]:TP[4]])))
+  XP[[3]] <- cbind(SP[[i]][[s_pa]][TP[5]:TP[6]]/max(abs(SP[[i]][[s_pa]][TP[5]:TP[6]])),SP[[i]][[s_pb]][TP[5]:TP[6]]/max(abs(SP[[i]][[s_pb]][TP[5]:TP[6]])))
+  
+  XP_TP[[i]] <- list(XP[[1]],XP[[2]],XP[[3]])
+}
+
+```
+
+Control plots for one individual
+```{r}
+# Define individual 
+individual_test <- 3
+plot(SP[[individual_test]][[4]], type= 'l',xlab = "Time", ylab = "Parameter 2")
+plot(XP_TP[[individual_test]][[1]], xlab = "Parameter 1", ylab = "Parameter 2", main = "Time Period 1")
+plot(XP_TP[[individual_test]][[2]], xlab = "Parameter 1", ylab = "Parameter 2", main = "Time Period 2")
+plot(XP_TP[[individual_test]][[3]], xlab = "Parameter 1", ylab = "Parameter 2", main = "Time Period 3")
+
+
+```
+Compute persitent homology for these phase diagrams and for each one of the patients. In this case Gamma is the trajectory in the phase space; $\Gamma^2$ is used for the specific computation of persistent bias, and is not relevant in the estimation of causal inferences. 
+
+
+* The computation takes place over all the defined time periods
+
+
+```{r}
+library(doParallel)
+library(foreach)
+DiagPH <- list()
+DiagPH_T <- list()
+cores=detectCores()
+cl <- makeCluster(cores[1]-1) #not to overload your computer
+registerDoParallel(cl)
+# Compute Gamma^2
+gamma <- 0
+if(gamma ==  0){
+  for(i in 1:NumberPatients){
+    DiagPH[[1]] <- gridDiag(X = XP_TP[[i]][[1]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH[[2]] <- gridDiag(X = XP_TP[[i]][[2]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH[[3]] <- gridDiag(X = XP_TP[[i]][[3]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH_T[[i]] <- list(DiagPH[[1]],DiagPH[[2]],DiagPH[[3]])
+}
+}
+
+if(gamma ==  1){
+  for(i in 1:NumberPatients){
+    DiagPH[[1]] <- gridDiag(X = XP_TP[[i]][[1]]*XP_TP[[i]][[1]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH[[2]] <- gridDiag(X = XP_TP[[i]][[2]]*XP_TP[[i]][[2]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH[[3]] <- gridDiag(X = XP_TP[[i]][[3]]*XP_TP[[i]][[3]], FUN = kde, h = h, lim = cbind(Xlim, Ylim),by = by, sublevel = FALSE, library = "Dionysus",printProgress = TRUE)
+    DiagPH_T[[i]] <- list(DiagPH[[1]],DiagPH[[2]],DiagPH[[3]])
+}
+}
+
+```
+Test - visualization of persistence bars:
+
+*DiagPH_T[[a]][[b]]* is interpreted as: 
+
+* *[a]* First list corresponds to the patient number
+* *[b]* Second list corresponds to the time period where the persistence were computed
+
+```{r}
+plot(DiagPH_T[[1]][[1]][["diagram"]], barcode = TRUE, main = "Barcode")
+plot(DiagPH_T[[1]][[2]][["diagram"]], barcode = TRUE, main = "Barcode")
+plot(DiagPH_T[[1]][[3]][["diagram"]], barcode = TRUE, main = "Barcode")
+```
+
+Comparative estimation of the distortion matrix as the difference between time periods for the computation of the KL-Entropy of the distribution of persistence bars: 
+
+* We make the analysis of the time series for each individual in different time periods
+* In this implementation, the definitions "auxp_i" and "auxp_j" are the different time periods within the time series
+
+Different to the analysis of the persistent entropy, we aim to perform this analysis for each individual/patient. 
+
+Considering the notation of the persistence bars, in this part we estimate the difference between: 
+
+* Birth (diagram[,3]) (Birth event in the persistence bar diagram)
+* Death (diagram[,2]) (death event in the persistence bar diagram)
+
+For the estimation of the Kullback Leiber (KL) divergence we require at least a computation over three different periods of time. 
+
+
+```{r}
+# This threshold parameter filters all the bars that deploy noise
+NL <- 0.05 #0.0005
+Diff_HG <- list()
+Diff_HGT <- list()
+Diff_HGT2 <- list()
+Perst_T1 <-list()
+Perst_T2 <- list()
+Perst_T3 <- list()
+for(i in 1:NumberPatients){
+  # The difference of the persistence bars will be computed for a single individual - analysis of time series for the single individual: for this reason i = j
+  j <- i
+  auxp_i <- 1
+  auxp_j <- 2
+  auxp_k <- 3
+  
+  # This one is the estimation of the persistence bars
+  #Bar <- Bar/max(Bar)
+  Bar <- DiagPH_T[[i]][[auxp_i]]$diagram[,2] - DiagPH_T[[i]][[auxp_i]]$diagram[,3]
+  #Bar <- unique(ifelse(abs(Bar) < NL,Bar <- Bar,Bar<- NA))
+  Bar1 <- DiagPH_T[[j]][[auxp_j]]$diagram[,2] - DiagPH_T[[j]][[auxp_j]]$diagram[,3]
+  Bar1 <- Bar1/max(Bar1)
+  #Bar1 <- unique(ifelse(abs(Bar) < NL,Bar <- Bar,Bar<- NA))
+  #Bar1 <- unique(ifelse(abs(Bar1) < NL,Bar1 <- Bar1,Bar1<- NA))
+  Bar2 <- DiagPH_T[[j]][[auxp_k]]$diagram[,2] - DiagPH_T[[j]][[auxp_k]]$diagram[,3]
+  #Bar2 <- unique(ifelse(abs(Bar2) < NL,Bar2 <- Bar2,Bar1<- NA))  
+  Bar2 <- Bar2/max(Bar2)
+  #Different time periods same individual
+  
+  aux_1 <- (Bar[1:15] - Bar1[1:15]) 
+  aux_2 <- (Bar1[1:15] - Bar2[1:15]) 
+  aux_1 <- ifelse(aux_1 > 1, aux_1 <- NA, aux_1 <- aux_1)
+  aux_2 <- ifelse(aux_2 > 1, aux_2 <- NA, aux_2 <- aux_2)  
+  #Diff_HG[[j]] <- abs(aux_1[!is.na(aux_1)])
+  #Diff_HG[[j]] <- (aux_1[!is.na(aux_1)])
+  Diff_HGT[[i]] <- abs(aux_1[!is.na(aux_1)])
+  Diff_HGT2[[i]] <- abs(aux_2[!is.na(aux_2)])
+  Perst_T1[[i]] <- Bar[!is.na(Bar)]#[1:length()]
+  Perst_T2[[i]] <- Bar1[!is.na(Bar1)]#[1:20]
+  Perst_T3[[i]] <- Bar2[!is.na(Bar2)]#[1:20]
+  # Estimation of the persistence bars
+}
+```
+
+The results computed from the persistent bars are then captured - stored for further control - evaluations: 
+
+```{r}
+#Directory
+# D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results
+
+capture.output(summary(Perst_T1), file = "RootDirectory/Perst_T1.txt")
+capture.output(summary(Perst_T2), file = "RootDirectory/Perst_T2.txt")
+capture.output(summary(Perst_T3), file = "RootDirectory/Perst_T3.txt")
+```
+
+And compute the corresponding entropy (Note: for some reason there is a problem with the entropy package in R - sometimes is necessary to restart the R session):
+
+* Computation of the persistent entropy
+* Computation of the $\Phi_S$ entropy
+
+```{r}
+library("infotheo")
+#library("DescTools")
+#library("FNN")
+aux <- 0
+#library("philentropy")
+library("entropy")
+Geom_Phi <- c()
+Mut_inf <- c()
+Geom_Phi1 <- c()
+Mut_inf1 <- c()
+for(i in 1:8){
+  #aux <- ifelse(Diff_HGT[[i]] > 1, aux <- NA, aux<- Diff_HGT[[i]])
+  #aux2 <- ifelse(Diff_HGT2[[i]] >= 1, aux2 <- NA, aux2<- Diff_HGT2[[i]])
+  P <-abs(Perst_T1[[i]])[1:20]   
+  #P <- aux[!is.na(aux)][1:4]
+  Q <- abs(Perst_T2[[i]])[1:20]
+  Q1 <- abs(Perst_T3[[i]])[1:20]
+  #Q <- aux2[!is.na(aux2)][1:4]
+  #x <- rbind(P,Q)
+  join_PQ <- cbind(P,Q)
+  join_PQ1 <- cbind(Q,Q1)
+  # Compute Kullback-Leiber Entropy
+  Geom_Phi[i] <- KL.plugin(P, Q)
+  Geom_Phi1[i] <- KL.plugin(Q, Q1)
+  # Compute the mutual information - in order to get the limit of the entropies
+  Mut_inf[i] <- entropy(P,Q)
+  #Mut_inf[i] <- mi.plugin(join_PQ)
+  Mut_inf1[i] <- entropy(Q,Q1)
+  #Mut_inf1[i] <-  mi.plugin(join_PQ1)
+}
+#Geom_Phi_2 <- abs(1-Geom_Phi/Mut_inf)
+#aux <- Geom_Phi_2 
+#aux2 <- ifelse(aux < 0, Geom_Phi_1 <- 0, Geom_Phi_1 <- aux)
+#Geom_Phi_1 <- aux2
+plot(Mut_inf)
+plot(Geom_Phi)
+plot(Mut_inf1)
+plot(Geom_Phi1)
+#plot(Geom_Phi_1)
+```
+
+In the next step we perform the computation of entropy for the final estimation of the diagram to asses the observability of the system. Observe that we perform this measurement for the individual $i$ respect other individuals $j$:  
+
+```{r}
+NL <- 0.005
+Diff_HG <- list()
+Diff_HGT <- list()
+for(i in 1:NumberPatients){
+  for(j in 1:NumberPatients){
+    if(i == j){
+      auxp_i <- 1
+      auxp_j <- 2
+    } 
+    else{
+      auxp_i <- 2
+      auxp_j <- 2
+    }
+
+    #Bar <- 0
+    #Bar1 <- 0
+    Bar <- DiagPH_T[[i]][[auxp_i]]$diagram[,2] - DiagPH_T[[i]][[auxp_i]]$diagram[,3]
+    #Bar <- Bar/max(Bar)
+    Bar <- unique(ifelse(abs(Bar) >= NL,Bar <- Bar,Bar<- NA))
+    Bar1 <- DiagPH_T[[j]][[auxp_j]]$diagram[,2] - DiagPH_T[[j]][[auxp_j]]$diagram[,3]
+    #Bar1 <- Bar1/max(Bar1)
+    Bar1 <- unique(ifelse(abs(Bar1) >= NL,Bar1 <- Bar1,Bar1<- NA))
+    #Different time periods same individual
+   
+    aux_1 <- (Bar[1:15] - Bar1[1:15]) 
+    #Diff_HG[[j]] <- abs(aux_1[!is.na(aux_1)])
+    Diff_HG[[j]] <- (aux_1[!is.na(aux_1)])
+  }
+  Diff_HGT[[i]] <- list(Diff_HG[[1]], Diff_HG[[2]], Diff_HG[[3]],Diff_HG[[4]],Diff_HG[[5]], Diff_HG[[6]], Diff_HG[[7]],Diff_HG[[8]])
+}
+library(entropy)
+aux_x2 <- matrix()
+for(k in 1: NumberPatients){
+
+  p2 <- c(entropy(sqrt((Diff_HGT[[k]][[1]])**2)),entropy(sqrt((Diff_HGT[[k]][[2]])**2)),entropy(sqrt((Diff_HGT[[k]][[3]])**2)),entropy(sqrt((Diff_HGT[[k]][[4]])**2)),entropy(sqrt((Diff_HGT[[k]][[5]])**2)),entropy(sqrt((Diff_HGT[[k]][[6]])**2)),entropy(sqrt((Diff_HGT[[k]][[7]])**2)),entropy(sqrt((Diff_HGT[[k]][[8]])**2)))
+    ifelse(k == 1, aux_x2 <- p2,aux_x2 <- cbind(aux_x2,p2))
+}
+aux_x3 <- matrix()
+for(k in 1: NumberPatients){
+
+  p3 <- c(entropy((Diff_HGT[[k]][[1]]**2)),entropy((Diff_HGT[[k]][[2]]**2)),entropy((Diff_HGT[[k]][[3]]**2)),entropy((Diff_HGT[[k]][[4]]**2)),entropy((Diff_HGT[[k]][[5]]**2)),entropy((Diff_HGT[[k]][[6]]**2)),entropy((Diff_HGT[[k]][[7]]**2)),entropy((Diff_HGT[[k]][[8]]**2)))
+    ifelse(k == 1, aux_x3 <- p3,aux_x3 <- cbind(aux_x3,p3))
+}
+
+```
+
+Compute the mean of the persistent entropy for each patient and construct the observability matrix:
+
+* The $\Phi_S$ Entropy is unique and computed for each patient
+* The persistent entropy is computed for patient $i$ respect patient $j$
+
+For this reason in the diagram there are $i + i = 2i$ dots in the final diagrams.
+
+The compute data is then exported and the 3D plot along the 3 axes (the 3D plot is performed with a separate program). 
+
+Furthermore we compute the limit of confidence of the computed data, i.e. the region where causal relationships are reliable, as the mean value of the mutual information.
+
+```{r}
+library(ggplot2)
+S_M <- c()
+refP <- mean(Mut_inf)
+for(i in 1:8){
+  S_M[i] <- mean(aux_x3[,i][!is.na(aux_x3[,i])]) #mean(aux_x3[,i])
+}
+Pat_Nr <- c(1,2,3,4,5,6,7,8)
+aux <- cbind(S_M,Geom_Phi,Pat_Nr)
+aux1 <- cbind(S_M,Geom_Phi1,Pat_Nr)
+Obs <- as.data.frame(rbind(aux,aux1))#as.data.frame(cbind(S_M,Geom_Phi,Pat_Nr))
+p <- ggplot(Obs,aes(S_M,Geom_Phi))+  geom_point(aes(size = 1,col=Pat_Nr))
+p + xlim(c(0,2.0))+ylim(c(0, 3.0)) + geom_abline(intercept = refP, slope = 0)+ labs(x=(expression(S(Gamma))), y=(expression(Phi[GP]))) #+geom_abline(intercept = 0, slope = 1)
+
+#Directory
+# D:/Projects/2022_MANUSCRITOS/2020_SUMMA_BIOL/Notebooks_Programs/Results
+
+if(axis == 1){
+  write.csv(Obs, file="RootDirectory/Phy_S_Diag_Mhealt_x.csv")
+}
+if(axis == 2){
+  write.csv(Obs, file="RootDirectory/Phy_S_Diag_Mhealt_y.csv")
+}
+if(axis == 3){
+  write.csv(Obs, file="RootDirectory/Phy_S_Diag_Mhealt_z.csv")
+}
+
+```
+
+Since the final result is essentially a distribution of dots representing the observability of the system, then we also define a box-plot to represent this data as a [double boxplot](https://www.r-bloggers.com/2013/11/double-box-plot-package-boxplotdbl-1-2-0-released/) in order to cluster the dots corresponding with a mechanistic or less mechanistic causal relationships.
+
+```{r}
+library(boxplotdbl)
+Class <- c()
+for(i in 1:length(Geom_Phi1)){
+  Class <- ifelse(Geom_Phi1 <=0.5, 1, 2)
+}
+
+Obs <- as.data.frame(cbind(S_M,Geom_Phi,Pat_Nr,Class))
+
+boxplot(Obs[,1])
+boxplotdou(Obs[c(4,1)],Obs[c(4,2)], xlim=c(0, 1.2), ylim=c(0, 2),xlab = "S(Gamma)",ylab = "Phi_S")
+abline(h=refP)
+```
+
+
+
+
